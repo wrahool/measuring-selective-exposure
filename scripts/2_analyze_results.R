@@ -55,6 +55,7 @@ analyze_results_new <- function(n1, n2, n3, sk, alpha, opt, allNMI, N) {
   message(paste0("Using ", metric_to_use))
   
   if (use_scaling_factor) {
+    print("here")
     message("Using scaling factor ... ")
     
     nmi_results <- nmi_results %>%
@@ -63,8 +64,7 @@ analyze_results_new <- function(n1, n2, n3, sk, alpha, opt, allNMI, N) {
       mutate(metric = ifelse(is.nan(metric), 0, metric)) %>%
       mutate(metric = metric * scaling_factors) %>%
       select(-scaling_factors)
-  }
-  else {
+  } else {
     message("Not using scaling factor ...")
     
     nmi_results <- nmi_results %>%
@@ -177,7 +177,57 @@ analyze_results_new <- function(n1, n2, n3, sk, alpha, opt, allNMI, N) {
     ylab("normalized mutual information score") +
     theme_bw()
   
-  return(list(nmi_ribbonplot, nmi_boxplot, default_better_tbl, use_scaling_factor, metric_to_use))
+  nmi_mean_sd <- nmi_mean_sd %>%
+    mutate(method = ifelse(method == "eb", "Edge Betweenness", 
+                           ifelse(method == "im", "Infomap",
+                                  ifelse(method == "le", "Leading Eigenvector",
+                                         ifelse(method == "sl", "Spin-Glass",
+                                                ifelse(method == "fg", "Fast Greedy",
+                                                       ifelse(method == "l", "Multilevel",
+                                                              ifelse(method == "lp", "Label Propagation",
+                                                                     ifelse(method == "wt", "WalkTrap", "")))))))))
+  
+  nmi_ribbonplot_rnr <- ggplot(nmi_mean_sd,
+                               aes(x = rho,
+                                   color = method,
+                                   fill = method)) +
+    geom_line(aes(x=rho,
+                  y=meanNMI), size = 1) +
+    # geom_ribbon(aes(ymin = lower_bound,
+    #                 ymax = upper_bound),
+    #             alpha = .3,
+    #             linetype = 0) +
+    geom_hline(aes(yintercept = 0.5),
+               color = "#FF0000",
+               linetype = "dashed") +
+    facet_wrap(~network,
+               # labeller = labeller(method = method_labels),
+               nrow = 2,
+               ncol = 4) +
+    xlab(expression(rho)) +
+    ylab(ylabel) +
+    theme_bw() +
+    scale_x_continuous(breaks = seq(from = 0, to = 1, by = 0.2)) +
+    scale_y_continuous(breaks = seq(from = 0, to = 1, by = 0.2)) +
+    theme(
+      strip.background = element_rect(
+        color="black", fill="black", size=1.5, linetype="solid"
+      ),
+      strip.text.x = element_text(
+        size = 12, color = "white"
+      ),
+      panel.grid.major.x = element_line(colour="gray90",size = rel(0.5)),
+      panel.grid.minor.x = element_line(colour="gray95",size = rel(0.5)),
+      panel.grid.major.y = element_line(colour="gray90",size = rel(0.5)),
+      panel.grid.minor.y = element_line(colour="gray95",size = rel(0.5)),
+      axis.text=element_text(size=7),
+      legend.position = "bottom"
+    )  +
+    theme(axis.text=element_text(size=11),
+          axis.title=element_text(size=14,face="bold"))
+  
+  
+  return(list(nmi_ribbonplot, nmi_boxplot, nmi_ribbonplot_rnr, default_better_tbl, use_scaling_factor, metric_to_use))
 }
 
 analyze_results_legacy <- function(n1, n2, n3, sk, alpha, opt, N) {
@@ -355,9 +405,9 @@ analyze_results_legacy <- function(n1, n2, n3, sk, alpha, opt, N) {
 }
 
 s <- 3
-a <- 2
+a <- 3
 # uncomment to use with allNMI = TRUE
-# res <- analyze_results_new(n1 = 100, n2 = 1000, n3 = 5, sk = s, alpha = a, allNMI = TRUE, N = 100, opt = FALSE)
+res <- analyze_results_new(n1 = 100, n2 = 1000, n3 = 5, sk = s, alpha = a, allNMI = TRUE, N = 100, opt = FALSE)
 # 
 # fn <- paste0("plots/sk", s, "_alpha", a, "_", ifelse(res[[4]], "S", ""), res[[5]], ".eps")
 # 
@@ -365,10 +415,16 @@ a <- 2
 
 # uncomment to use with no allNMI and for sensitivity analysis for alpha, sk values other than 3, 3
 
-res <- analyze_results_legacy(n1 = 100, n2 = 1000, n3 = 5, sk = s, alpha = a, N = 100, opt = FALSE)
+# res <- analyze_results_legacy(n1 = 100, n2 = 1000, n3 = 5, sk = s, alpha = a, N = 100, opt = FALSE)
 
 res[[1]]
 
 fn <- paste0("plots/sk", s, "_alpha", a, ".eps")
 
 ggsave(res[[1]], filename = fn, device=cairo_ps)
+
+# for RNR
+
+rnr_fn <- paste0("plots/sk", s, "_alpha", a, "_rnr.eps")
+ggsave(res[[3]], filename = rnr_fn, device=cairo_ps, height = 5)
+  
